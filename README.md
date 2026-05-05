@@ -52,6 +52,26 @@ LogLine **minimal conditions** for this behaviour (pocket-aligned) live in the m
 - `logline canon/v0.1/pocket/source/pr_stewardship.loop.v0.1.json`
 - `logline canon/v0.1/pocket/notes/pr_stewardship.md`
 
+## GitHub mobile app (iPhone)
+
+Execution stays **on your Mac**; the phone only **opens an Issue** on GitHub.
+
+1. Create a label once (desktop):  
+   `gh label create repo-forge --repo OWNER/REPO --description "repo-forge remote queue"`
+2. Prefer a **private** repo for this queue, or set **`GH_FORGE_ISSUE_ALLOWED_AUTHORS`** (comma-separated GitHub usernames). Anyone who can open an issue with that label can otherwise trigger your local agent.
+3. On the Mac (logged in with `gh auth login`), run:
+
+```bash
+export GH_FORGE_ISSUE_REPO=OWNER/REPO
+export GH_FORGE_ISSUE_ALLOWED_AUTHORS=yourusername
+export REPO_FACTORY_CWD=/path/to/project/to/edit   # optional
+./agent/gh_issue_daemon.sh
+```
+
+4. On the **GitHub app**: New issue → title livre → **body = o prompt completo** para o `repo-forge` → assign label **`repo-forge`** → submit.
+
+The daemon polls every ~45s, runs `./repo-forge` with the issue body, posts the report as a comment (truncated if huge), and closes the issue.
+
 ## Layout
 
 - `CLAUDE.md` — autonomy instructions for the agent (generic).
