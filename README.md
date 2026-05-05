@@ -20,6 +20,13 @@ Optional: `npm install` if you want the TS SDK mirrored locally.
 ./repo-factory "your goal in natural language"
 ```
 
+Optional: point the agent at another checkout (edit/build there; config still loads from repo-forge):
+
+```bash
+export REPO_FACTORY_CWD=/path/to/other/repo
+./repo-factory "…"
+```
+
 Tune defaults in `agent/config.yaml` (goal fallback, `required_final_checks`, bash block patterns).
 
 ## Queue / daemon

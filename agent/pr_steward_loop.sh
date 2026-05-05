@@ -5,8 +5,9 @@
 #
 # Env:
 #   PR_STEWARD_ROOT   — git repo to work in (default: directory containing repo-forge)
-#   REPO_FORGE_HOME   — installation root of repo-forge (default: inferred from this script)
+#   REPO_FORGE_HOME   — repo-forge install root if not alongside this script (default: inferred)
 #   REPO_FORGE_BIN    — override path to repo-factory executable
+#   REPO_FACTORY_CWD  — optional override for agent cwd (default: set from PR_STEWARD_ROOT below)
 #   PR_STEWARD_INTERVAL — seconds between iterations (default: 120)
 #   PR_STEWARD_GOAL   — prompt passed to repo-factory each cycle
 #   PR_STEWARD_FORCE  — if 1, run a cycle even when no open PRs
@@ -18,10 +19,16 @@ FORGE_HOME="$(cd "$(dirname "$0")/.." && pwd)"
 WORKDIR="${PR_STEWARD_ROOT:-$FORGE_HOME}"
 cd "$WORKDIR"
 
-INTERVAL="${PR_STEWARD_INTERVAL:-120}"
+INTERVAL_RAW="${PR_STEWARD_INTERVAL:-120}"
+if [[ ! "$INTERVAL_RAW" =~ ^[0-9]+$ ]] || [[ "$INTERVAL_RAW" -lt 1 ]]; then
+  echo "PR_STEWARD_INTERVAL must be a positive integer; got: ${INTERVAL_RAW}" >&2
+  exit 1
+fi
+INTERVAL="$INTERVAL_RAW"
+
 FORCE="${PR_STEWARD_FORCE:-0}"
 
-FACTORY="${REPO_FORGE_BIN:-$FORGE_HOME/repo-factory}"
+FACTORY="${REPO_FORGE_BIN:-${REPO_FORGE_HOME:-$FORGE_HOME}/repo-factory}"
 if [[ ! -x "$FACTORY" ]]; then
   echo "repo-factory not executable at $FACTORY — set REPO_FORGE_BIN or install repo-forge." >&2
   exit 1
@@ -46,6 +53,8 @@ if ! command -v gh >/dev/null 2>&1; then
 fi
 
 echo "pr_steward_loop workdir=$(pwd) forge=$(dirname "$FACTORY") interval=${INTERVAL}s force=${FORCE}"
+
+export REPO_FACTORY_CWD="${REPO_FACTORY_CWD:-$WORKDIR}"
 
 while true; do
   OPEN=$(gh pr list --state open --json number --jq 'length' 2>/dev/null || echo 0)

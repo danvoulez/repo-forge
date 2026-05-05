@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -19,13 +20,25 @@ from claude_agent_sdk.types import (
     ResultMessage,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
-LOG_DIR = ROOT / "logs"
-AUDIT_LOG = LOG_DIR / "agent_audit.log"
+FORGE_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _target_root() -> Path:
+    """Working copy to edit; defaults to repo-forge install dir."""
+    raw = os.environ.get("REPO_FACTORY_CWD", "").strip()
+    if raw:
+        return Path(raw).expanduser().resolve()
+    return FORGE_ROOT
+
+
+def _audit_log_path(target: Path) -> Path:
+    log_dir = target / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "repo-forge-audit.log"
 
 
 def _load_config() -> dict:
-    path = ROOT / "agent" / "config.yaml"
+    path = FORGE_ROOT / "agent" / "config.yaml"
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
@@ -45,26 +58,30 @@ def _compile_bash_blockers(patterns: list[str]) -> list[re.Pattern[str]]:
 _BASH_BLOCKERS = _compile_bash_blockers(CONFIG.get("blocked_bash_patterns", []))
 
 
-async def audit_file_change(
-    input: HookInput,
-    tool_use_id: str | None,
-    context: HookContext,
-) -> HookJSONOutput:
-    if input.get("hook_event_name") != "PostToolUse":
+def _make_audit_hook(target: Path):
+    audit_log = _audit_log_path(target)
+
+    async def audit_file_change(
+        input: HookInput,
+        tool_use_id: str | None,
+        context: HookContext,
+    ) -> HookJSONOutput:
+        if input.get("hook_event_name") != "PostToolUse":
+            return {"continue_": True}
+
+        tool_name = input.get("tool_name", "")
+        if tool_name not in {"Write", "Edit"}:
+            return {"continue_": True}
+
+        tool_input = input.get("tool_input") or {}
+        file_path = tool_input.get("file_path") or tool_input.get("path") or "unknown"
+
+        with audit_log.open("a", encoding="utf-8") as fh:
+            fh.write(f"{tool_use_id or '?'}: {tool_name} {file_path}\n")
+
         return {"continue_": True}
 
-    tool_name = input.get("tool_name", "")
-    if tool_name not in {"Write", "Edit"}:
-        return {"continue_": True}
-
-    tool_input = input.get("tool_input") or {}
-    file_path = tool_input.get("file_path") or tool_input.get("path") or "unknown"
-
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    with AUDIT_LOG.open("a", encoding="utf-8") as fh:
-        fh.write(f"{tool_use_id or '?'}: {tool_name} {file_path}\n")
-
-    return {"continue_": True}
+    return audit_file_change
 
 
 async def bash_guard(
@@ -140,6 +157,7 @@ def _final_checks_block(checks: list[str]) -> str:
 
 
 async def main() -> None:
+    target = _target_root()
     user_goal = " ".join(sys.argv[1:]).strip()
     if not user_goal:
         user_goal = str(CONFIG.get("goal", "")).strip()
@@ -149,7 +167,8 @@ async def main() -> None:
 
     system_prompt = f"""You are Repository Factory, an autonomous local engineering agent.
 
-Repository root: {ROOT}
+Repository root (working copy): {target}
+Tooling / config loaded from repo-forge install: {FORGE_ROOT}
 
 Mission:
 {CONFIG.get("goal")}
@@ -177,12 +196,16 @@ Execute end-to-end without questions. When finished, output only the final repor
             HookMatcher(matcher="Bash", hooks=[bash_guard], timeout=30.0),
         ],
         "PostToolUse": [
-            HookMatcher(matcher="Write|Edit", hooks=[audit_file_change], timeout=15.0),
+            HookMatcher(
+                matcher="Write|Edit",
+                hooks=[_make_audit_hook(target)],
+                timeout=15.0,
+            ),
         ],
     }
 
     options = ClaudeAgentOptions(
-        cwd=str(ROOT),
+        cwd=str(target),
         system_prompt=system_prompt,
         max_turns=int(CONFIG.get("max_turns", 80)),
         permission_mode=str(CONFIG.get("permission_mode", "acceptEdits")),
