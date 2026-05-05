@@ -27,6 +27,24 @@ Tune defaults in `agent/config.yaml` (goal fallback, `required_final_checks`, ba
 - Drop tasks as `inbox/*.txt`; `./agent/daemon.sh` runs `./repo-factory` and writes `outbox/*.report.txt`.
 - macOS: copy `agent/repo-factory.plist.example`, replace paths, `launchctl load` the plist.
 
+## PR loop (open PRs → cycle → drift)
+
+When `gh` is installed and authenticated, `./agent/pr_steward_loop.sh` keeps running: if there are open PRs (or `PR_STEWARD_FORCE=1`), it invokes `repo-factory` with a stewardship goal, then sleeps (`PR_STEWARD_INTERVAL`, default 120s).
+
+Work in another repo:
+
+```bash
+export PR_STEWARD_ROOT=/path/to/your/git/checkout
+# optional: export REPO_FORGE_BIN=/path/to/repo-forge/repo-factory
+./agent/pr_steward_loop.sh
+```
+
+LogLine **minimal conditions** for this behaviour (pocket-aligned) live in the minilab tree:
+
+- `logline canon/v0.1/pocket/source/pr_stewardship.loop.v0.1.logline`
+- `logline canon/v0.1/pocket/source/pr_stewardship.loop.v0.1.json`
+- `logline canon/v0.1/pocket/notes/pr_stewardship.md`
+
 ## Layout
 
 - `CLAUDE.md` — autonomy instructions for the agent (generic).
