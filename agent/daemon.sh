@@ -2,6 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+export REPO_FACTORY_CWD="${REPO_FACTORY_CWD:-$ROOT}"
 
 while true; do
   shopt -s nullglob

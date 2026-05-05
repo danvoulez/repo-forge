@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.repo-forge.github-queue</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>REPLACE_WITH_ABSOLUTE_PATH_TO_REPO_FORGE/agent/start_github_queue.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>REPLACE_WITH_ABSOLUTE_PATH_TO_REPO_FORGE</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>REPLACE_WITH_ABSOLUTE_PATH_TO_REPO_FORGE/logs/gh-queue.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>REPLACE_WITH_ABSOLUTE_PATH_TO_REPO_FORGE/logs/gh-queue.err.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>PATH</key>
+      <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+      <key>ANTHROPIC_API_KEY</key>
+      <string>PASTE_KEY_HERE_OR_USE_LOGIN_SHELL_WRAPPER</string>
+    </dict>
+  </dict>
+</plist>

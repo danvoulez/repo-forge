@@ -1,0 +1,22 @@
+name: Repo Forge command
+description: Envia um comando ao repo-forge no teu Mac (daemon gh_issue_daemon / start_github_queue).
+labels:
+  - repo-forge
+body:
+  - type: markdown
+    attributes:
+      value: |
+        O **corpo** deste issue torna-se o prompt do `./repo-forge` no Mac.
+        No telemóvel: escolhe este modelo, preenche o prompt e submete.
+
+        Requer **Mac ligado** com `./agent/start_github_queue.sh` (ou `gh_issue_daemon.sh`)
+        e `ANTHROPIC_API_KEY` + CLI `claude`.
+  - type: textarea
+    id: prompt
+    attributes:
+      label: Prompt (instrução completa)
+      description: Exemplo — “Corre os testes, corrige falhas, abre PR com resumo.”
+      placeholder: |
+        Explora o repositório em REPO_FACTORY_CWD, …
+    validations:
+      required: true

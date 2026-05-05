@@ -7,3 +7,4 @@ __pycache__/
 node_modules/
 logs/*.log
 agent/state.sqlite
+agent/github-queue.env

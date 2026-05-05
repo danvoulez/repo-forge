@@ -54,23 +54,37 @@ LogLine **minimal conditions** for this behaviour (pocket-aligned) live in the m
 
 ## GitHub mobile app (iPhone)
 
-Execution stays **on your Mac**; the phone only **opens an Issue** on GitHub.
+Execution stays **on your Mac**; the phone only opens an **Issue** on GitHub.
 
-1. Create a label once (desktop):  
-   `gh label create repo-forge --repo OWNER/REPO --description "repo-forge remote queue"`
-2. Prefer a **private** repo for this queue, or set **`GH_FORGE_ISSUE_ALLOWED_AUTHORS`** (comma-separated GitHub usernames). Anyone who can open an issue with that label can otherwise trigger your local agent.
-3. On the Mac (logged in with `gh auth login`), run:
+### One-time on this repo (`danvoulez/repo-forge`)
+
+- Label **`repo-forge`** is already created.
+- Issue form **“Repo Forge command”** (`.github/ISSUE_TEMPLATE/repo-forge-command.yml`) applies that label when you use “New issue” → choose the template.
+
+### Mac (leave it running)
 
 ```bash
-export GH_FORGE_ISSUE_REPO=OWNER/REPO
-export GH_FORGE_ISSUE_ALLOWED_AUTHORS=yourusername
-export REPO_FACTORY_CWD=/path/to/project/to/edit   # optional
-./agent/gh_issue_daemon.sh
+cd /path/to/repo-forge
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once
+export ANTHROPIC_API_KEY="sk-ant-..."   # every shell, or put in launchd plist / login shell
+
+cp agent/github-queue.env.example agent/github-queue.env
+# edit github-queue.env — at minimum GH_FORGE_ISSUE_REPO and GH_FORGE_ISSUE_ALLOWED_AUTHORS
+
+./agent/doctor.sh          # preflight: venv, claude, gh, API key
+./agent/start_github_queue.sh   # polls Issues → runs repo-forge → comment → close
 ```
 
-4. On the **GitHub app**: New issue → title livre → **body = o prompt completo** para o `repo-forge` → assign label **`repo-forge`** → submit.
+Optional macOS background: edit **`agent/gh-issue-queue.plist.example`** (paths + `ANTHROPIC_API_KEY`), copy to `~/Library/LaunchAgents/`, `launchctl load …`.
 
-The daemon polls every ~45s, runs `./repo-forge` with the issue body, posts the report as a comment (truncated if huge), and closes the issue.
+### iPhone (GitHub app)
+
+**New issue** → select template **Repo Forge command** → fill **Prompt** → submit.  
+Within ~45s (poll interval) the Mac picks it up, runs the agent, replies on the issue, then closes it.
+
+**Security:** keep the queue repo private or always set **`GH_FORGE_ISSUE_ALLOWED_AUTHORS`** (comma-separated handles).
+
+Legacy manual flow (no template): new issue + label **`repo-forge`** + body = prompt; still works with `./agent/gh_issue_daemon.sh`.
 
 ## Layout
 
