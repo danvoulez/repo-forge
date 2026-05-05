@@ -1,0 +1,29 @@
+# Generic autonomous factory — tune per repo or pass goals on the CLI.
+project_name: repo
+goal: >-
+  Explore this repository, infer its purpose and verification commands from docs
+  and config files, then complete the most valuable small improvement that fits
+  the operator’s latest instruction (if any).
+max_turns: 80
+permission_mode: acceptEdits
+setting_sources:
+  - project
+allowed_tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Glob
+  - Grep
+  - WebSearch
+  - WebFetch
+  - Task
+  - Skill
+blocked_bash_patterns:
+  - 'rm\s+-rf\s+/'
+  - sudo\s+rm
+  - 'curl\s+.*\|\s*sh'
+  - 'chmod\s+-R\s+777\s+/'
+# Fill with commands that exist in this repo (e.g. make test, npm test, cargo test).
+# Leave empty to let the agent discover checks from CI/README only.
+required_final_checks: []
