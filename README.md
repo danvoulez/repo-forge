@@ -1,6 +1,6 @@
 # repo-forge
 
-Local autonomous runner built on the **Claude Agent SDK** (Claude Code CLI). Same workflow on any repository: you give a goal; it maps the tree, edits, runs checks, and prints one final report.
+Local autonomous runner built on the **Claude Agent SDK** (Claude Code CLI). Same workflow on any repository: you give a goal; it maps the tree, edits, runs checks, and prints one final report. The SDK stays the engine, but the API endpoint is **provider-agnostic** (Anthropic, Bedrock, Vertex, or any Anthropic-compatible gateway).
 
 ## Setup
 
@@ -8,11 +8,45 @@ Local autonomous runner built on the **Claude Agent SDK** (Claude Code CLI). Sam
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-# Claude Code CLI on PATH (`claude`) + ANTHROPIC_API_KEY
+# Claude Code CLI on PATH (`claude`) + credentials for your provider (see below)
 export ANTHROPIC_API_KEY="..."
 ```
 
 Optional: `npm install` if you want the TS SDK mirrored locally.
+
+## Providers (where the API calls go)
+
+The Claude Agent SDK remains the execution engine; the `provider:` section of
+`agent/config.yaml` only decides **where model API calls are sent**. Switching
+providers is config + env only — no code changes, same hooks, same reviewers.
+
+| Provider | `provider.name` | Required environment |
+|---|---|---|
+| Anthropic (default) | `anthropic` | `ANTHROPIC_API_KEY` |
+| Amazon Bedrock | `bedrock` | `AWS_PROFILE` or `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` or `AWS_BEARER_TOKEN_BEDROCK` |
+| Google Vertex AI | `vertex` | `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION` (+ GCP auth) |
+| Any Anthropic-compatible gateway | `gateway` | `provider.base_url` in config + a key (`provider.api_key_env`, or `ANTHROPIC_AUTH_TOKEN`) |
+
+`gateway` covers LiteLLM, OpenRouter, Kimi/GLM/DeepSeek proxies, and
+self-hosted endpoints — anything that speaks the Anthropic Messages API. Example:
+
+```yaml
+provider:
+  name: gateway
+  base_url: https://your-gateway.example.com
+  api_key_env: MY_GATEWAY_KEY   # env var holding the gateway key
+  model: some-model-name
+```
+
+Optional keys for any provider: `model` (→ `ANTHROPIC_MODEL`),
+`small_fast_model`, and free-form `extra_env`.
+
+Preflight validates the configured provider and fails loud with what is missing:
+
+```bash
+.venv/bin/python agent/providers.py --check   # or just run ./agent/doctor.sh
+.venv/bin/python agent/providers.py --list
+```
 
 ## Run
 
@@ -91,3 +125,4 @@ Legacy manual flow (no template): new issue + label **`repo-forge`** + body = pr
 - `CLAUDE.md` — autonomy instructions for the agent (generic).
 - `.claude/skills/` — optional Skills (`repo-worker`, `autonomous-review`, `sdk-reader`).
 - `agent/factory.py` — supervisor (`query()` + hooks + Task subagents).
+- `agent/providers.py` — provider registry: config → SDK env vars, fail-loud preflight (`--check` / `--list`).

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Generic repository factory supervisor (Claude Agent SDK + Claude Code CLI)."""
+"""Generic repository factory supervisor.
+
+Execution engine: Claude Agent SDK + Claude Code CLI (unchanged).
+API endpoint:   provider-agnostic — see agent/providers.py and the
+                `provider:` section of agent/config.yaml.
+"""
 
 from __future__ import annotations
 
@@ -10,17 +15,69 @@ from pathlib import Path
 
 import anyio
 import yaml
-from claude_agent_sdk import ClaudeAgentOptions, query
-from claude_agent_sdk.types import (
-    AgentDefinition,
-    HookContext,
-    HookInput,
-    HookJSONOutput,
-    HookMatcher,
-    ResultMessage,
-)
 
 FORGE_ROOT = Path(__file__).resolve().parents[1]
+
+# --- Resolve the provider BEFORE importing the SDK -------------------------
+# The SDK / Claude Code CLI reads provider env vars (ANTHROPIC_BASE_URL,
+# CLAUDE_CODE_USE_BEDROCK, …) when it starts, so they must be in place first.
+from providers import ProviderError, resolve_provider  # noqa: E402
+
+
+def _load_config() -> dict:
+    path = FORGE_ROOT / "agent" / "config.yaml"
+    cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(cfg, dict):
+        print(f"repo-forge: {path} must be a YAML mapping", file=sys.stderr)
+        sys.exit(2)
+    known = {
+        "project_name",
+        "goal",
+        "max_turns",
+        "permission_mode",
+        "setting_sources",
+        "allowed_tools",
+        "blocked_bash_patterns",
+        "required_final_checks",
+        "provider",
+    }
+    for key in sorted(set(cfg) - known):
+        print(f"repo-forge: warning: unknown config key {key!r} in {path}", file=sys.stderr)
+    return cfg
+
+
+CONFIG = _load_config()
+
+try:
+    PROVIDER = resolve_provider(CONFIG.get("provider"), os.environ)
+except ProviderError as exc:
+    print(f"repo-forge: provider configuration error:\n{exc}", file=sys.stderr)
+    sys.exit(2)
+os.environ.update(PROVIDER.env)
+
+print(
+    f"repo-forge: provider={PROVIDER.name} ({PROVIDER.description})"
+    + (f" model={PROVIDER.model}" if PROVIDER.model else ""),
+    file=sys.stderr,
+)
+
+try:
+    from claude_agent_sdk import ClaudeAgentOptions, query
+    from claude_agent_sdk.types import (
+        AgentDefinition,
+        HookContext,
+        HookInput,
+        HookJSONOutput,
+        HookMatcher,
+        ResultMessage,
+    )
+except ImportError:
+    print(
+        "repo-forge: claude-agent-sdk is not installed — run:\n"
+        "  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
+        file=sys.stderr,
+    )
+    sys.exit(2)
 
 
 def _target_root() -> Path:
@@ -35,14 +92,6 @@ def _audit_log_path(target: Path) -> Path:
     log_dir = target / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir / "repo-forge-audit.log"
-
-
-def _load_config() -> dict:
-    path = FORGE_ROOT / "agent" / "config.yaml"
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
-
-
-CONFIG = _load_config()
 
 
 def _compile_bash_blockers(patterns: list[str]) -> list[re.Pattern[str]]:
@@ -156,7 +205,7 @@ def _final_checks_block(checks: list[str]) -> str:
     )
 
 
-async def main() -> None:
+async def main() -> int:
     target = _target_root()
     user_goal = " ".join(sys.argv[1:]).strip()
     if not user_goal:
@@ -204,7 +253,7 @@ Execute end-to-end without questions. When finished, output only the final repor
         ],
     }
 
-    options = ClaudeAgentOptions(
+    options_kwargs: dict = dict(
         cwd=str(target),
         system_prompt=system_prompt,
         max_turns=int(CONFIG.get("max_turns", 80)),
@@ -214,6 +263,9 @@ Execute end-to-end without questions. When finished, output only the final repor
         agents=_agents(),
         hooks=hooks,
     )
+    if PROVIDER.model:
+        options_kwargs["model"] = PROVIDER.model
+    options = ClaudeAgentOptions(**options_kwargs)
 
     final_text: str | None = None
     exit_error: str | None = None
@@ -231,7 +283,20 @@ Execute end-to-end without questions. When finished, output only the final repor
     if exit_error and not final_text:
         print(f"FAILED ({exit_error})\n")
     print(final_text or "No final result returned (see Claude Code transcript / stderr).")
+    return 1 if exit_error else 0
 
 
 if __name__ == "__main__":
-    anyio.run(main)
+    try:
+        raise SystemExit(anyio.run(main))
+    except KeyboardInterrupt:
+        print("\nrepo-forge: interrupted by operator", file=sys.stderr)
+        raise SystemExit(130)
+    except Exception as exc:  # SDK / CLI startup or transport failures
+        print(
+            f"\nrepo-forge: FAILED — agent run aborted: {type(exc).__name__}: {exc}\n"
+            "check provider credentials/endpoint (./agent/doctor.sh) and the "
+            "Claude Code CLI installation.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
