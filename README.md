@@ -63,6 +63,15 @@ export REPO_FACTORY_CWD=/path/to/other/repo
 
 Tune defaults in `agent/config.yaml` (goal fallback, `required_final_checks`, bash block patterns).
 
+### Hardening (built in)
+
+- **Config validation** — malformed `config.yaml` fails loud (exit 2) before any model call.
+- **Transient retries** — rate limits / overload / network errors retry with exponential backoff (`max_retries`, `retry_backoff_seconds`). Auth and config errors never retry.
+- **Wall-clock limit** — `max_run_seconds` caps a run (0 = no limit); a timeout ends FAILED, not hung.
+- **Filesystem guard** — Write/Edit outside the working copy (`REPO_FACTORY_CWD` or the install dir) is denied by a PreToolUse hook.
+- **Audit trail** — every file mutation *and* every Bash command lands in `logs/repo-forge-audit.log` with UTC timestamps.
+- **Exit codes** — 0 success, 1 run failure, 2 config/provider error, 130 operator interrupt.
+
 ## Queue / daemon
 
 - Drop tasks as `inbox/*.txt`; `./agent/daemon.sh` runs `./repo-factory` and writes `outbox/*.report.txt`.

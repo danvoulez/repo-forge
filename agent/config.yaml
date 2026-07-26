@@ -24,6 +24,12 @@ goal: >-
   and config files, then complete the most valuable small improvement that fits
   the operator’s latest instruction (if any).
 max_turns: 80
+
+# Hardening (safe defaults shown; all optional):
+max_retries: 2            # retries on transient API/network errors (0 = never retry)
+retry_backoff_seconds: 5  # first retry delay; doubles each attempt
+max_run_seconds: 0        # wall-clock limit per run, in seconds (0 = no limit)
+
 permission_mode: acceptEdits
 setting_sources:
   - project
