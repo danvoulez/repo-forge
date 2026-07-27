@@ -1,10 +1,35 @@
 # Generic autonomous factory — tune per repo or pass goals on the CLI.
 project_name: repo
+
+# API provider — the Claude Agent SDK stays the engine; this only decides
+# WHERE the model API calls go. Valid names: anthropic | bedrock | vertex | gateway
+# (see agent/providers.py — run `python agent/providers.py --list`).
+provider:
+  name: anthropic
+  # model: claude-sonnet-4-5              # optional; maps to ANTHROPIC_MODEL
+  # small_fast_model: claude-haiku-4-5    # optional; maps to ANTHROPIC_SMALL_FAST_MODEL
+  #
+  # Amazon Bedrock:  name: bedrock   (+ AWS_PROFILE or AWS_ACCESS_KEY_ID/... in env)
+  # Google Vertex:   name: vertex    (+ ANTHROPIC_VERTEX_PROJECT_ID, CLOUD_ML_REGION in env)
+  #
+  # Any Anthropic-compatible gateway (LiteLLM, OpenRouter, Kimi, GLM, self-hosted):
+  #   name: gateway
+  #   base_url: https://your-gateway.example.com   # must speak the Anthropic Messages API
+  #   api_key_env: MY_GATEWAY_KEY                  # env var holding the gateway key
+  #   model: some-model-name
+  #   extra_env: {}                                # optional free-form VAR: value pairs
+
 goal: >-
   Explore this repository, infer its purpose and verification commands from docs
   and config files, then complete the most valuable small improvement that fits
   the operator’s latest instruction (if any).
 max_turns: 80
+
+# Hardening (safe defaults shown; all optional):
+max_retries: 2            # retries on transient API/network errors (0 = never retry)
+retry_backoff_seconds: 5  # first retry delay; doubles each attempt
+max_run_seconds: 0        # wall-clock limit per run, in seconds (0 = no limit)
+
 permission_mode: acceptEdits
 setting_sources:
   - project
